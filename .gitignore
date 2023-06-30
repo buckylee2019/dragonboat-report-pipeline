@@ -1,0 +1,10 @@
+logs/
+data/
+client_secret.json
+*.pyc
+index.html
+chatgpt/
+airflow.cfg
+.env
+splitwise-nouse.py
+.DS_Store
