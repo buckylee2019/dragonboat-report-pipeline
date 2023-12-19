@@ -5,10 +5,11 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
 import sys
 from airflow.providers.http.operators.http import SimpleHttpOperator
+from airflow.providers.google.suite.transfers.sql_to_sheets import SQLToGoogleSheetsOperator
 sys.path.insert(0, '/opt/airflow/scripts')  # Replace 'path/to/another_directory' with the actual directory path
 import loaddata
 # Define the DAG and its properties
-
+from airflow.operators.postgres_operator import PostgresOperator
 
 default_args = {
     'owner': 'airflow',
@@ -26,13 +27,12 @@ dag = DAG(
 
 # Define the task that runs the Python file
 
-clear_table = PythonOperator(
-        task_id = 'drop_and_create_table',
-        python_callable=loaddata.exec_sql,
-        op_args=['truncate_and_create_all.sql'],
+clear_table = PostgresOperator(
+        task_id="clear_table",
+        sql="sql/truncate_and_create_all.sql",
+        postgres_conn_id="postgres_default",
         dag=dag
-)
-
+    )
 
 download_attendance = BashOperator(
     task_id='download_attendance',
@@ -78,103 +78,131 @@ download_announce = BashOperator(
     dag=dag
 )
 
-loadItem2DB = PythonOperator(
-        task_id='load_Item2DB',
+create_insert_item_sql = PythonOperator(
+        task_id='create_insert_item_sql',
         python_callable=loaddata.upsert_item,
         op_args=['Item.csv'],
         dag=dag
     )
-loadContacts2DB = PythonOperator(
-        task_id='load_Contacts2DB',
+insert_item = PostgresOperator(
+        task_id="insert_item",
+        sql="sql/insert_item.sql",
+        postgres_conn_id="postgres_default",
+        dag=dag
+    )
+create_insert_contacts_sql = PythonOperator(
+        task_id='create_insert_contacts_sql',
         python_callable=loaddata.upsert_contacts,
         op_args=['Contacts.csv'],
         dag=dag
     )
-
-loadMember2DB = PythonOperator(
-        task_id='load_Member2DB',
+insert_contacts = PostgresOperator(
+        task_id="insert_contacts",
+        sql="sql/insert_contacts.sql",
+        postgres_conn_id="postgres_default",
+        dag=dag
+    )
+create_insert_member_sql = PythonOperator(
+        task_id='create_insert_member_sql',
         python_callable=loaddata.upsert_memberfee,
         op_args=['Memberfee.csv'],
         dag=dag
     )
-
-loadAttendance2DB = PythonOperator(
-        task_id='load_Attendance2DB',
+insert_member = PostgresOperator(
+        task_id="insert_member",
+        sql="sql/insert_memberfee.sql",
+        postgres_conn_id="postgres_default",
+        dag=dag
+    )
+create_insert_attendance_sql = PythonOperator(
+        task_id='create_insert_attendance_sql',
         python_callable=loaddata.upsert_attendance,
         op_args=['Attendance.csv'],
         dag=dag
     )
+insert_attendance = PostgresOperator(
+        task_id="insert_attendance",
+        sql="sql/insert_attendance.sql",
+        postgres_conn_id="postgres_default",
+        dag=dag
+    )
 # Set the task dependencies
-loadExpense2DB = PythonOperator(
-        task_id='load_Expense2DB',
+create_insert_expense_sql = PythonOperator(
+        task_id='create_insert_expense_sql',
         python_callable=loaddata.upsert_expense,
         op_args=['Expense.csv'],
         dag=dag
     )
-
-loadPayment2DB = PythonOperator(
-        task_id='load_Payment2DB',
+insert_expense = PostgresOperator(
+        task_id="insert_expense",
+        sql="sql/insert_expense.sql",
+        postgres_conn_id="postgres_default",
+        dag=dag
+    )
+create_insert_payment_sql = PythonOperator(
+        task_id='create_insert_payment_sql',
         python_callable=loaddata.upsert_payment,
         op_args=['Payment.csv'],
         dag=dag
     )
-download_detail_report = PythonOperator(
-        task_id = 'download_detail_report',
-        python_callable=loaddata.export_query,
-        op_args=['report.sql','detail_report.csv'],
+insert_payment = PostgresOperator(
+        task_id="insert_payment",
+        sql="sql/insert_payment.sql",
+        postgres_conn_id="postgres_default",
         dag=dag
-)
-
-download_attendance_report = PythonOperator(
-        task_id = 'download_attendance_rp',
-        python_callable=loaddata.export_query,
-        op_args=['attendance.sql','attendance_report.csv'],
-        dag=dag
-)
-download_summary_report = PythonOperator(
-        task_id = 'download_summary_rp',
-        python_callable=loaddata.export_query,
-        op_args=['summarize_report.sql','financial_report.csv'],
-        dag=dag
-)
-upload_CSV_attendance = BashOperator(
-    task_id='upload_CSV_attendance',
-    bash_command='python /opt/airflow/scripts/gsupdate.py {0} {1} {2}'.format('IBM\ Dragon\ Boat', "RP_Attendance", "attendance_report.csv"),
-    dag=dag
-)
-
-upload_CSV_summary = BashOperator(
-    task_id='upload_CSV_summary',
-    bash_command='python /opt/airflow/scripts/gsupdate.py {0} {1} {2}'.format('IBM\ Dragon\ Boat', "Final\ Report", "financial_report.csv"),
-    dag=dag
+    )
+upload_sql_to_sheet = SQLToGoogleSheetsOperator(
+    task_id="upload_sql_to_sheet",
+    sql='sql/report.sql',
+    sql_conn_id="postgres_default",
+    database="airflow",
+    spreadsheet_id="1oCHouAQvLN-aM9PzswXeMTklxL3CCcoEQ30AG0Wbq2c",
+    spreadsheet_range="Test",
+    gcp_conn_id="gcp_default",
 )
 
 
-upload_CSV_detail = BashOperator(
-    task_id='uploadcsv2detail',
-    bash_command='python /opt/airflow/scripts/gsupdate.py {0} {1} {2}'.format('IBM\ Dragon\ Boat', "Expense\ Detail", "detail_report.csv"),
-    dag=dag
+upload_attendance = SQLToGoogleSheetsOperator(
+    task_id="upload_attendance",
+    sql='sql/attendance.sql',
+    sql_conn_id="postgres_default",
+    database="airflow",
+    spreadsheet_id="1oCHouAQvLN-aM9PzswXeMTklxL3CCcoEQ30AG0Wbq2c",
+    spreadsheet_range="RP_Attendance",
+    gcp_conn_id="gcp_default",
 )
 
+upload_summary = SQLToGoogleSheetsOperator(
+    task_id="upload_summary",
+    sql='sql/summarize_report.sql',
+    sql_conn_id="postgres_default",
+    database="airflow",
+    spreadsheet_id="1oCHouAQvLN-aM9PzswXeMTklxL3CCcoEQ30AG0Wbq2c",
+    spreadsheet_range="Final Report",
+    gcp_conn_id="gcp_default",
+)
+
+
+upload_detail = SQLToGoogleSheetsOperator(
+    task_id="upload_detail",
+    sql='sql/report.sql',
+    sql_conn_id="postgres_default",
+    database="airflow",
+    spreadsheet_id="1oCHouAQvLN-aM9PzswXeMTklxL3CCcoEQ30AG0Wbq2c",
+    spreadsheet_range="Expense Detail",
+    gcp_conn_id="gcp_default",
+)
 notify_unpaid = BashOperator(
     task_id='notify_unpaid_member',
     bash_command='python /opt/airflow/scripts/line_notification.py',
     dag=dag
 )
 clear_table >> download_item
-[download_item,download_memberfee,download_contacts,download_attendance,download_expense,download_payment] >> (loadContacts2DB)
-# download_item.set_downstream([loadItem2DB])
-# download_memberfee.set_downstream([loadMember2DB])
-# download_contacts.set_downstream([loadContacts2DB])
-# download_attendance.set_downstream([loadAttendance2DB])
-# download_expense.set_downstream([loadExpense2DB])
-# download_payment.set_downstream([loadPayment2DB])
+[download_item,download_memberfee,download_contacts,download_attendance,download_expense,download_payment] >> (create_insert_contacts_sql)
 
-loadContacts2DB >> [loadPayment2DB,loadItem2DB,loadMember2DB,loadMember2DB,loadAttendance2DB,loadExpense2DB]>>(download_detail_report)
-download_detail_report >> upload_CSV_detail
-loadAttendance2DB >> download_attendance_report >> upload_CSV_attendance
-upload_CSV_detail >> download_summary_report >> upload_CSV_summary >> notify_unpaid
-# loadMember2DB.set_upstream(download_report)
-# loadContacts2DB.set_upstream(download_report)
-# loadAttendance2DB.set_upstream(download_report)
-# loadExpense2DB.set_upstream(download_report)
+
+create_insert_contacts_sql >> [create_insert_payment_sql,create_insert_item_sql,create_insert_member_sql,create_insert_member_sql,create_insert_attendance_sql,create_insert_expense_sql]>>insert_contacts
+insert_contacts >> [insert_item,insert_payment,insert_attendance,insert_member,insert_expense]
+
+insert_attendance >> upload_attendance
+upload_attendance >> upload_detail >> upload_summary >> notify_unpaid

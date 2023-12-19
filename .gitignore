@@ -8,3 +8,4 @@ airflow.cfg
 .env
 splitwise-nouse.py
 .DS_Store
+variables.json

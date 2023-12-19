@@ -20,11 +20,12 @@ groups = sObj.getGroups()
 
 date_export = Variable.get('date_export', default_var=datetime.now().strftime('%Y-%m-%d'))
 # date_export = "2023-06-17"
-dated_before = datetime.strptime(date_export, '%Y-%m-%d')
+timedelta(1)
+dated_before = datetime.strptime(date_export, '%Y-%m-%d') + timedelta(days=1)
 dated_after = dated_before - relativedelta(months=1)
 
 # 帳戶,幣種,記錄類型,主類別,子類別,金額,手續費,折扣,名稱,商家,日期,時間,專案,描述,標籤,對象
-expense = sObj.getExpenses(dated_after=dated_after, dated_before=dated_before)
+expense = sObj.getExpenses(dated_after=dated_after, dated_before=dated_before,limit=60)
 # data_dir = "/Users/buckylee/Library/CloudStorage/Box-Box/My Box/99_Tools/Airflow/scripts/data/splitwise_2023-06-02.csv"
 data_dir = f"/opt/airflow/scripts/data/splitwise_{date_export}.csv"
 with open(data_dir,'w') as f:
@@ -47,6 +48,9 @@ with open(data_dir,'w') as f:
         elif ex.getCategory().getName() == 'Gas/fuel':
             category = "交通"
             subcategory = "加油費"
+        elif ex.getCategory().getName() ==  "Taxes":
+            category = "個人"
+            subcategory = "稅金"
         else:
             category = "購物"
             subcategory = "市場"
